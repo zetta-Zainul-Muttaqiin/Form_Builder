@@ -24,12 +24,16 @@ def display_editable_form(form_result, form_path):
     if not form_result:
         st.warning("No form data.")
         return
+    
+    # Get list of labels and reverse lookup
+    type_keys = list(QUESTION_TYPES.keys())
+    type_labels = list(QUESTION_TYPES.values())
 
     form_description = form_result.get("description", "")
     form_steps = form_result.get("steps", [])
 
     st.markdown(f"### 📝 Form Description")
-    st.info(form_description)
+    st.text_area("Description:", value=form_description)
 
     for step_idx, step in enumerate(form_steps):
         step_name = step.get("step_name", f"Step {step_idx+1}")
@@ -40,53 +44,57 @@ def display_editable_form(form_result, form_path):
 
         edited_questions = []
 
-        for q_idx, q in enumerate(step.get("step_questions", [])):
-            st.markdown("---")
-            st.markdown(f"**Question {q_idx+1}**")
+        for q_idx, question in enumerate(step.get("step_questions", [])):
+            with st.container(border=True):
 
-            q_text = st.text_input(
-                "Question Text", value=q.get("question_text", ""),
-                key=f"qtext_{step_idx}_{q_idx}"
-            )
+                st.markdown(f"**Question {q_idx+1}**")
 
-            q_type = st.selectbox(
-                "Question Type", QUESTION_TYPES,
-                index=QUESTION_TYPES.index(q.get("question_type", QUESTION_TYPES[0])),
-                key=f"qtype_{step_idx}_{q_idx}"
-            )
+                q_text = st.text_input(
+                    "Question Text", value=question.get("question_text", ""),
+                    key=f"qtext_{step_idx}_{q_idx}"
+                )
+                current_type_key = question.get("question_type", type_keys[0])
+                current_label = QUESTION_TYPES.get(current_type_key, type_labels[0])
+                default_index = type_labels.index(current_label)
+                q_type = st.selectbox(
+                    "Question Type", options=type_labels, index=default_index,
+                    key=f"qtype_{step_idx}_{q_idx}"
+                )
 
-            q_desc = st.text_area(
-                "Question Description", value=q.get("question_description", ""),
-                key=f"qdesc_{step_idx}_{q_idx}"
-            )
+                q_desc = st.text_area(
+                    "Question Description", value=question.get("question_description", ""),
+                    key=f"qdesc_{step_idx}_{q_idx}"
+                )
 
-            q_example = st.text_area(
-                "Question Example", value=q.get("question_example", ""),
-                key=f"qexample_{step_idx}_{q_idx}"
-            )
+                q_example = st.text_area(
+                    "Question Example", value=question.get("question_example", ""),
+                    key=f"qexample_{step_idx}_{q_idx}"
+                )
 
-            # Format question_example if it's a list-type question
-            parsed_example = q_example
-            if q_type in [
-                "single_option", "multiple_option",
-                "dropdown_single_option", "multiple_choice_dropdown_menu"
-            ]:
-                options = [opt.strip() for opt in re.split(r'[\n,]+', q_example) if opt.strip()]
-                parsed_example = " / ".join(options)
+                # Format question_example if it's a list-type question
+                parsed_example = q_example
+                if q_type in [
+                    "single_option", "multiple_option",
+                    "dropdown_single_option", "multiple_choice_dropdown_menu",
+                    "slider_rating"
+                ]:
+                    options = [opt.strip() for opt in re.split(r'[\n,]+', q_example) if opt.strip()]
+                    parsed_example = " / ".join(options)
 
-            edited_questions.append({
-                "question_text": q_text,
-                "question_type": q_type,
-                "question_description": q_desc,
-                "question_example": parsed_example
-            })
+                edited_questions.append({
+                    "question_text": q_text,
+                    "question_type": q_type,
+                    "question_description": q_desc,
+                    "question_example": parsed_example
+                })
 
         # Button to Save Changes for this step
-        if st.button(f"💾 Save Step {step_idx+1}", key=f"save_step_{step_idx}"):
+        if st.button(f"💾 Save Step {step_idx+1}", key=f"save_step_{step_idx}", type='primary'):
             form_result["steps"][step_idx]["step_questions"] = edited_questions
             write_json_form(form_result, form_path)
             st.success(f"Step {step_idx+1} updated successfully.")
 
+        st.markdown("---")
 
 def write_json_form(form_data, path):
     with open(path, "w", encoding="utf-8") as f:
@@ -102,6 +110,7 @@ def display_selected_form(form_result, form_path):
 
     form_description = form_result.get("description", "")
     form_steps = form_result.get("steps", [])
+    form_title = form_result.get("form_title", "Form Title")
 
     tab1, tab2 = st.tabs(["🗂 Form Details", "📝 Preview Form"])
 
@@ -111,8 +120,9 @@ def display_selected_form(form_result, form_path):
 
     # *************** Tab 2: Preview Form Interaction ***************
     with tab2:
-        st.markdown("### 📝 Fill Out the Form")
-
+        st.markdown(f"### 📝 {form_title}")
+        st.info(form_description)
+        
         for id_step, step in enumerate(form_steps):
             step_name = step.get("step_name", f"Step {id_step+1}")
             with st.expander(f"{id_step+1}/ {step_name}"):
@@ -128,7 +138,7 @@ def render_question_input(question, step_idx, q_idx):
     question_example = question.get("question_example", "")
     input_key = f"step{step_idx}_q{q_idx}_{question_text[:5]}"
 
-    if question_type == "text_area_short":
+    if question_type == "short_text":
         st.text_input(question_text, placeholder=question_example or "", key=input_key)
 
     elif question_type == "text_area_long":
@@ -158,12 +168,34 @@ def render_question_input(question, step_idx, q_idx):
     elif question_type == "single_option":
         st.radio(question_text, options=question_example.split(" / ") if isinstance(question_example, str) else question_example, key=input_key)
 
+    elif question_type == "slider_rating":
+        render_slider_rating(question_text, question_example, input_key)
+
     elif question_type == "upload_document":
         st.file_uploader(question_text, type=["pdf", "docx", "txt"], key=input_key)
 
     else:
         st.warning(f"{question_text} - Unsupported input type: {question_type}")
 
+def render_slider_rating(question_text,question_example, input_key):
+    if question_example:
+        try:
+            # Try splitting by ' - ', ',' or space
+            parts = re.split(r"[,\s\-]+", question_example.strip())
+            min_val = int(parts[0])
+            max_val = int(parts[1]) if len(parts) > 1 else min_val + 10
+        except Exception as e:
+            st.warning(f"⚠️ Invalid example format for slider: '{question_example}'. Using default 1-5")
+            min_val, max_val = 1, 5
+    else:
+        min_val, max_val = 1, 5
+
+    st.slider(
+        label=question_text,
+        min_value=min_val,
+        max_value=max_val,
+        key=input_key
+    )
 
 
 # *************** Render Question Card ***************
@@ -202,7 +234,7 @@ def render_form_steps(steps: list):
 @st.dialog("Enter Form Prompt")
 def prompt_dialog():
     prompt_input = st.text_area("Describe the form you want to create:", placeholder="e.g. A three-page student registration form...")
-    col1, col2 = st.columns(2)
+    col1, _ = st.columns(2)
     with col1:
         if st.button("🚀 Generate Form"):
             if not prompt_input.strip():
@@ -213,17 +245,13 @@ def prompt_dialog():
                     result = run_agent_form(prompt_input)
                     st.session_state.form_result = result
                     st.success("Form generated!")
-                except Exception as e:
+                except Exception as error:
                     st.error("Failed to generate form.")
-                    st.exception(e)
-            
-                result = run_agent_form(prompt_input)
+                    st.exception(error)
             
             if result:
                 save_form_response(result)
-
-    with col2:
-        st.button("❌ Cancel", on_click=st.rerun)
+                st.rerun(scope='fragment')
 
 def save_form_response(form_response: dict):
 
@@ -279,37 +307,40 @@ def load_form_content(file_path) -> dict:
 def main_page():
     # *************** Main UI: Result Section ***************
     st.title("📝 AI-Powered Form Builder")
-    st.markdown("Use the sidebar to input a prompt. Below you’ll see the structured preview of the AI-generated form.")
+    st.markdown("Click the button below to generate a Form using Agentic AI.")
     
     with st.sidebar:
         st.markdown("### 📄 Generated Forms")
 
         form_files = list_saved_forms()
+        with st.container(border=True, height=350):
+            if not form_files:
+                st.info("No saved forms found.")
+            else:
+                for file_path in form_files:
+                    data = load_form_content(file_path)
+                    file_name = os.path.basename(file_path)
+                    form_id = data.get('form_id', 'id')
+                    form_title = data.get("form_content").get('form_title', '')
+                    created_at = data.get("timestamp", {}).get("created_at", "unknown")
 
-        if not form_files:
-            st.info("No saved forms found.")
-        else:
-            for file_path in form_files:
-                data = load_form_content(file_path)
-                file_name = os.path.basename(file_path)
-                form_id = data.get('form_id', 'id')
-                form_title = data.get('form_tile', '')
-                created_at = data.get("timestamp", {}).get("created_at", "unknown")
+                    # Display card-like layout
+                    container = st.container(key=form_id)
+                    container.markdown(f"""
+                        <div style="border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin-bottom: 10px;">
+                            <strong>{form_title if form_title else file_name}</strong><br>
+                            <span style='color: gray;'>🕒 {created_at}</span><br><br>
+                        </div>
+                    """, unsafe_allow_html=True)
 
-                # Display card-like layout
-                container = st.container(key=form_id)
-                container.markdown(f"""
-                    <div style="border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin-bottom: 10px;">
-                        <strong>{form_title if form_title else file_name}</strong><br>
-                        <span style='color: gray;'>🕒 {created_at}</span><br><br>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                view_key = f"view_{form_id}"
-                view_button = container.button("🔍 View", key=view_key)
-                if view_button:
-                    st.session_state.form_result = data["form_content"]
-                    st.session_state.form_loaded_name = file_name  # optional: track which was loaded
+                    view_key = f"view_{form_id}"
+                    view_button = container.button("🔍 View", key=view_key)
+                    if view_button:
+                        st.session_state.form_result = data["form_content"]
+                        st.session_state.form_loaded_name = file_name  # optional: track which was loaded
+                    
+                    st.markdown("\n")
+                
     
     # *************** Show Prompt Button ***************
     if st.button("Create New Form Prompt"):

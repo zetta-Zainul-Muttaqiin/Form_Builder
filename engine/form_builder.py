@@ -43,7 +43,7 @@ def generate_questions(prompt: str) -> str:
 You are a form builder. Generate form questions based on the prompt: '{prompt}'.
 For each question, include:
 - question_text
-- question_type (use ONLY one of: date, time, duration, email, text_area_short, text_area_long, multiple_choice_dropdown_menu, dropdown_single_option, multiple_option, single_option, upload_document)
+- question_type (use ONLY one of: date, time, duration, email, short_text, text_area_long, multiple_choice_dropdown_menu, dropdown_single_option, multiple_option, single_option, slider_rating, upload_document)
 - question_description
 - question_example
 Ensure consistency in type naming and format. Output should be structured.

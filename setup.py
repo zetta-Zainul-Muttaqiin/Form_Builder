@@ -58,8 +58,17 @@ ASTRADB_COLLECTION_NAME=api_key["ASTRADB_COLLECTION_NAME"]
 
 
 
-QUESTION_TYPES = [
-    "date", "time", "duration", "email", "text_area_short", "text_area_long",
-    "multiple_choice_dropdown_menu", "dropdown_single_option",
-    "multiple_option", "single_option", "upload_document"
-]
+QUESTION_TYPES = {
+    "date": "Date",
+    "time": "Time",
+    "duration": "Duration",
+    "email": "Email",
+    "text_area_short": "Simple Text",
+    "text_area_long": "Text Area",
+    "multiple_choice_dropdown_menu": "Drop-Down with Multiple Option",
+    "dropdown_single_option": "Drop-Down with Single Option",
+    "multiple_option": "Multiple Option",
+    "single_option": "Single Option",
+    "slider_rating": "Rating",
+    "upload_document": "Upload Document"
+}
