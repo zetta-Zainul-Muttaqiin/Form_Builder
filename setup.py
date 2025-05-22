@@ -4,6 +4,12 @@ import logging
 
 from dotenv import load_dotenv
 
+import streamlit as st
+
+
+# ********* set token for openai and datastax from streamli secrets.toml
+api_key = st.secrets["api"]
+
 # *************** CREATE LOGGER ***************
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
@@ -41,14 +47,15 @@ logging.getLogger("astrapy.collection").setLevel(logging.WARNING)
 load_dotenv(os.path.join(".env"), override=True)
 
 # *************** Set token for openai
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_EMBEDD_API_KEY = os.getenv("EMBEDDING_API_KEY")
+OPENAI_API_KEY = api_key["OPENAI_API_KEY"]
+OPENAI_EMBEDD_API_KEY = api_key["EMBEDDING_API_KEY"]
 
 # *************** Set token for DataStax
-ASTRADB_TOKEN_KEY=os.getenv("ASTRADB_TOOLBOX_TOKEN_KEY")
-ASTRADB_API_ENDPOINT=os.getenv("ASTRADB_TOOLBOX_API_ENDPOINT")
-ASTRADB_NAMESPACE_NAME=os.getenv("ASTRADB_FORM_NAMESPACE_NAME")
-ASTRADB_COLLECTION_NAME=os.getenv("ASTRADB_COLLECTION_NAME")
+ASTRADB_TOKEN_KEY=api_key["ASTRADB_TOOLBOX_TOKEN_KEY"]
+ASTRADB_API_ENDPOINT=api_key["ASTRADB_TOOLBOX_API_ENDPOINT"]
+ASTRADB_NAMESPACE_NAME=api_key["ASTRADB_FORM_NAMESPACE_NAME"]
+ASTRADB_COLLECTION_NAME=api_key["ASTRADB_COLLECTION_NAME"]
+
 
 
 QUESTION_TYPES = [
