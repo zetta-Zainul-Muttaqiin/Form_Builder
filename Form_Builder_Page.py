@@ -521,4 +521,3 @@ def main_page():
 
 if __name__ == "__main__":
     main_page()
-    st.write(st.session_state)
