@@ -1,9 +1,14 @@
 # *************** IMPORT LIBRARY ***************
 import json
-from typing import TypedDict, Literal
-from operator import itemgetter
-from pydantic import BaseModel, Field
+from typing import TypedDict, Literal, List
+
 from langchain_core.tools import tool
+from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables import RunnableSequence
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_community.callbacks import get_openai_callback
+
 from langgraph.graph import END, START, StateGraph
 
 from models.llms import LLMModels
@@ -18,6 +23,21 @@ class State(TypedDict):
     step_questions: str
     final_form: str
 
+# *************** QUESTIONS SCHEMA ***************
+class QuestionItem(BaseModel):
+    question_text: str
+    question_type: Literal[
+        "date", "time", "duration", "email",
+        "short_text", "text_area_long",
+        "multiple_choice_dropdown_menu", "dropdown_single_option",
+        "multiple_option", "single_option", "slider_rating",
+        "upload_document"
+    ]
+    question_description: str
+    question_example: str
+
+class QuestionsOutput(BaseModel):
+    questions: List[QuestionItem]
 
 # *************** EVALUATOR SCHEMA ***************
 class EvaluationFeedback(BaseModel):
@@ -41,15 +61,28 @@ def generate_steps(prompt: str) -> str:
 @tool
 def generate_questions(prompt: str) -> str:
     """Generate detailed questions based on a form prompt"""
-    return LLMModels().nano.invoke(f"""
-You are a form builder. Generate form questions based on the prompt: '{prompt}'.
-For each question, include:
+
+    question_prompt = PromptTemplate.from_template("""
+You are a form builder. Based on the prompt below, generate a list of form questions.
+
+Prompt:
+{prompt}
+
+Output a JSON object with a single key "questions", containing a list of questions.
+Each question must have:
 - question_text
-- question_type (use ONLY one of: date, time, duration, email, short_text, text_area_long, multiple_choice_dropdown_menu, dropdown_single_option, multiple_option, single_option, slider_rating, upload_document)
+- question_type (choose ONLY from: date, time, duration, email, short_text, text_area_long, multiple_choice_dropdown_menu, dropdown_single_option, multiple_option, single_option, slider_rating, upload_document)
 - question_description
 - question_example
-Ensure consistency in type naming and format. Output should be structured.
-""").content
+
+Ensure type names match exactly and output is valid JSON.
+""")
+
+    question_parser = JsonOutputParser(pydantic_object=QuestionsOutput)
+
+    generate_questions_chain: RunnableSequence = question_prompt | LLMModels().nano | question_parser
+
+    return generate_questions_chain.invoke({"prompt": prompt})
 
 def evaluate_generated_output(prompt: str, content: str, component: str) -> dict:
     """Evaluate the generated description/steps/questions"""
@@ -69,8 +102,6 @@ Please assess whether this content is acceptable for final form generation.
     result = evaluator.invoke(eval_prompt)
     return {"grade": result.grade, "feedback": result.feedback}
 
-# Form Context:
-# {context_form}
 
 # *************** AGGREGATOR FINAL FORM GENERATOR ***************
 def generate_final_form(state: State) -> dict:
