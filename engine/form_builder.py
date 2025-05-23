@@ -8,6 +8,8 @@ from langgraph.graph import END, START, StateGraph
 
 from models.llms import LLMModels
 
+from setup import LOGGER
+
 # *************** GRAPH STATE ***************
 class State(TypedDict):
     user_prompt: str
@@ -177,7 +179,7 @@ def convert_json(string_json: str) -> dict[str, list[dict]]:
     return converted
 
 
-def run_agent_form(user_input: str):
+def run_agent_form(user_input: str) -> dict[str, list[dict]]:
 
     agent_form = agent_form_builder()
 
@@ -187,6 +189,8 @@ def run_agent_form(user_input: str):
         final_form = convert_json(form_result.get('final_form'))
     else:
         final_form = form_result['final_form']
+
+    LOGGER.info(f"Form Generated {final_form.keys() if isinstance(final_form, dict) else {'type': f'{final_form}'}}")
 
     return final_form
 
