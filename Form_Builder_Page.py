@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import os
 import re
 import glob
@@ -96,6 +97,19 @@ def prompt_dialog():
                 st.rerun(scope='fragment')
                
 
+# *************** Shared Helper for List-Type Example Parsing ***************
+def parse_list_type_example(example_text: str) -> list[str]:
+    """
+    Parse list-type example string into a list of options.
+    
+    Supports delimiters: newline (\n), comma (,), semicolon (;), slash (/), and backslash (\).
+    """
+    if not isinstance(example_text, str):
+        return []
+    
+    normalized = example_text.replace("\\n", "\n")  # Convert escaped newline to real newline
+    return [opt.strip() for opt in re.split(r'[\n,;/\\]+', normalized) if opt.strip()]
+
 
 def display_editable_form(form_result: dict, form_path: str):
     if not form_result:
@@ -158,7 +172,8 @@ def display_editable_form(form_result: dict, form_path: str):
                     "dropdown_single_option", "multiple_choice_dropdown_menu",
                     "slider_rating"
                 ]:
-                    options = [opt.strip() for opt in re.split(r'[\n,]+', q_example) if opt.strip()]
+                    # Support delimiters: newline, comma, semicolon, slash, backslash
+                    options = parse_list_type_example(q_example)
                     parsed_example = " / ".join(options)
 
                 edited_questions.append({
@@ -183,34 +198,127 @@ def write_json_form(form_data: dict, path: str):
         json.dump(form_data, f, indent=2)
 
 
+# *************** Tab 3: Table View of Form Answers ***************
+def render_form_table_preview(form_result: dict):
+
+    form_content = form_result.get("form_content", {})
+    form_title = form_content.get("form_title", "Form Title")
+    form_steps = form_content.get("steps", [])
+
+    table_data = []
+
+    for step in form_steps:
+        step_name = step.get("step_name", "")
+        for question in step.get("step_questions", []):
+            table_data.append({
+                "form_name": form_title,
+                "step_name": step_name,
+                "question": question.get("question", ""),
+                "answer": question.get("answer", "")  # Can update if answer is stored elsewhere
+            })
+
+    if table_data:
+        df = pd.DataFrame(table_data)
+        st.markdown(f"### 📊 Table of Form Answers")
+        st.dataframe(df, use_container_width=True)
+
+        # Optional: Export section
+        with st.expander("📁 Export Table"):
+            csv = df.to_csv(index=False)
+            st.download_button("⬇️ Download as CSV", csv, file_name="form_answers.csv", mime="text/csv")
+    else:
+        st.info("No answers available yet to preview.")
+
+
+
 # *************** Display Form in Tabs ***************
 def display_selected_form(form_result: dict, form_path: str):
+
     if not form_result:
         st.warning("No form selected.")
         return
 
+    # *************** Load Form Content ***************
     form_content = form_result.get('form_content', {})
     form_description = form_content.get("description", "")
     form_steps = form_content.get("steps", [])
     form_title = form_content.get("form_title", "Form Title")
 
-    tab1, tab2 = st.tabs(["🗂 Form Details", "📝 Preview Form"])
+    # *************** Define Output Path ***************
+    output_dir = "data/output"
+    os.makedirs(output_dir, exist_ok=True)
+    csv_file = os.path.splitext(os.path.basename(form_path))[0] + ".csv"
+    csv_path = os.path.join(output_dir, csv_file)
+
+    # *************** Display Tabs ***************
+    tab1, tab2, tab3 = st.tabs(["🗂 Form Details", "📝 Preview Form", "📊 Form Table Preview"])
+
 
     # *************** Tab 1: Form Details ***************
     with tab1:
         display_editable_form(form_result, form_path)
 
-    # *************** Tab 2: Preview Form Interaction ***************
+    # *************** TAB 2: Preview + Submit ***************
     with tab2:
         st.markdown(f"### 📝 {form_title}")
         st.info(form_description)
-        
-        for id_step, step in enumerate(form_steps):
-            step_name = step.get("step_name", f"Step {id_step+1}")
-            with st.expander(f"{id_step+1}/ {step_name}"):
 
+        st.session_state.question_list = []
+        for id_step, step in enumerate(form_steps):
+            step_name = step.get("step_name", f"Step {id_step + 1}")
+            with st.expander(f"{id_step + 1}/ {step_name}"):
                 for id_question, question in enumerate(step.get("step_questions", [])):
                     render_question_input(question, id_step, id_question)
+                    print(f"{id_question} Question: {question}")
+                    st.session_state.question_list.append((id_step, id_question, step_name, question.get("question", "")))
+
+        if st.button("✅ Submit Form", type="primary", use_container_width=True):
+            # Collect Answers from Session State
+            new_answers = []
+            for id_step, id_question, step_name, question_text in st.session_state.question_list:
+                key = f"step{id_step}_q{id_question}_{question_text[:5]}"
+                answer = st.session_state.get(key, "").strip()
+                if answer:
+                    new_answers.append({
+                        "form_name": form_title,
+                        "step_name": step_name,
+                        "question": question_text,
+                        "answer": answer
+                    })
+
+            if not new_answers:
+                st.warning("No answers provided.")
+                return
+
+            # Load existing CSV if available
+            if os.path.exists(csv_path):
+                df_existing = pd.read_csv(csv_path)
+            else:
+                df_existing = pd.DataFrame(columns=["form_name", "step_name", "question", "answer"])
+
+            # Convert both to DataFrame
+            df_new = pd.DataFrame(new_answers)
+
+            # Merge with existing: Remove duplicates (based on form_name + step_name + question)
+            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+            df_combined.drop_duplicates(subset=["form_name", "step_name", "question"], keep="last", inplace=True)
+
+            # Save updated CSV
+            df_combined.to_csv(csv_path, index=False)
+            st.success(f"✅ Form submitted and saved to `{csv_path}`")
+
+    
+    # *************** TAB 3: Display Saved Data ***************
+    with tab3:
+        if os.path.exists(csv_path):
+            df_display = pd.read_csv(csv_path)
+            if not df_display.empty:
+                st.markdown("### 📊 Submitted Answers")
+                st.dataframe(df_display)
+            else:
+                st.info("No data available in the CSV.")
+        else:
+            st.info("No submission has been made yet.")
 
 
 # *************** Render Question Input ***************
@@ -219,6 +327,7 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
     question_type = question.get("question_type", "Unknown").lower().strip()
     question_description = question.get("question_description", "")
     question_example = question.get("question_example", question_description)
+    options = parse_list_type_example(question_example) if isinstance(question_example, str) else question_example
     input_key = f"step{step_idx}_q{q_idx}_{question_text[:5]}"
 
     if question_type == "short_text":
@@ -242,15 +351,15 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
     elif question_type == "multiple_choice_dropdown_menu":
         st.multiselect(
             question_text, 
-            options=question_example.split(" / ") if isinstance(question_example, str) else question_example, 
+            options=options, 
             key=input_key,
             help=question_description
-            )
+        )
 
     elif question_type == "dropdown_single_option":
         st.selectbox(
             question_text, 
-            options=question_example.split(" / ") if isinstance(question_example, str) else question_example, 
+            options=options, 
             key=input_key,
             help=question_description
         )
@@ -258,7 +367,7 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
     elif question_type == "multiple_option":
         st.multiselect(
             question_text, 
-            options=question_example.split(" / ") if isinstance(question_example, str) else question_example, 
+            options=options, 
             key=input_key,
             help=question_description
         )
@@ -266,7 +375,7 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
     elif question_type == "single_option":
         st.radio(
             question_text, 
-            options=question_example.split(" / ") if isinstance(question_example, str) else question_example, 
+            options=options, 
             key=input_key,
             help=question_description
         )
@@ -412,3 +521,4 @@ def main_page():
 
 if __name__ == "__main__":
     main_page()
+    st.write(st.session_state)
