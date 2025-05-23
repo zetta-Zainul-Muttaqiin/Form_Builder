@@ -24,10 +24,10 @@ class LLMModels:
         """
         Initializes the LLMModels class and sets up the OpenAI model for CV processing.
         """
-        self.nano = self.create_llm_cv()
+        self.nano = self.nano()
     
     # *************** Define a function for initializing OpenAI LLM
-    def create_llm_cv(self) -> ChatOpenAI:
+    def nano(self) -> ChatOpenAI:
         """
         Creates and configures an instance of OpenAI's GPT-4o-mini model.
 
