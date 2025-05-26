@@ -192,9 +192,35 @@ def display_editable_form(form_result: dict, form_path: str):
 
         st.markdown("---")
 
+
 def write_json_form(form_data: dict, path: str):
-    FORM_DIR = os.path.join('data', 'form_builder', path)
-    with open(FORM_DIR, "w", encoding="utf-8") as f:
+    """
+    Write form data as JSON to a file path, ensuring it is stored under 'data/form_builder'.
+
+    Args:
+        form_data (dict): The form data to be written.
+        path (str): The relative or absolute file path.
+
+    Returns:
+        None
+    """
+    # *************** Define root directory ***************
+    root_dir = os.path.join('data', 'form_builder')
+
+    # *************** Normalize the input path ***************
+    normalized_path = os.path.normpath(path)
+
+    # *************** Check if path starts with 'data/form_builder' ***************
+    # Only use the relative path to compare
+    if not normalized_path.split(os.sep)[:2] == ['data', 'form_builder']:
+        # If not, prepend root_dir to force write inside 'data/form_builder'
+        final_path = os.path.join(root_dir, normalized_path)
+    else:
+        final_path = normalized_path
+
+    # *************** Write the JSON file ***************
+    os.makedirs(os.path.dirname(final_path), exist_ok=True)
+    with open(final_path, "w", encoding="utf-8") as f:
         json.dump(form_data, f, indent=2)
 
 
