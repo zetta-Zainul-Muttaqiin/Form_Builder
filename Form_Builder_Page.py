@@ -35,11 +35,12 @@ def render_prompt_suggestions():
     """Render prompt suggestion buttons and handle prompt injection."""
     suggestions = get_prompt_suggestions()
     st.markdown("##### 💡 Prompt Suggestions")
-    _, col, _ = st.columns([0.1,0.8,0.1], vertical_alignment="center")
+    _, col, _ = st.columns([0.05,0.9,0.05], vertical_alignment="center")
     for idx, prompt in enumerate(suggestions):
         key_prompt = f"prompt_suggest_{idx}"
+        split_prompt = prompt.split()
         with col:
-            if st.button(f"{prompt[:45]}...", key=key_prompt, help=prompt):
+            if st.button(f"{' '.join(split_prompt[:20])}...", key=key_prompt, help=prompt):
                 st.session_state.prompt_input_text = prompt
                 st.rerun(scope="fragment")
 
@@ -52,7 +53,6 @@ def handle_generate_form(prompt_text: str) -> None:
     with st.spinner("Generating form..."):
         try:
             result = run_agent_form(prompt_text)
-            st.session_state.form_result = result
             st.success("Form generated!")
         except Exception as error:
             st.error("❌ Failed to generate form.")
@@ -63,7 +63,7 @@ def handle_generate_form(prompt_text: str) -> None:
             save_form_response(result)  # Save JSON file
             st.rerun()  # Trigger refresh to show in preview tab
 
-@st.dialog("Enter Form Prompt")
+@st.dialog("Enter Form Prompt", width="large")
 def prompt_dialog():
     # Initialize prompt input text if needed
     if 'prompt_input_text' not in st.session_state:
@@ -80,7 +80,7 @@ def prompt_dialog():
     prompt_container = st.container(border=True)
 
     # Action buttons
-    col1, _, col2 = st.columns([1,0.5,1])
+    col1, _, col2 = st.columns([0.4,0.35,0.25])
 
     with col1:
         if st.button("🚀 Generate Form"):
