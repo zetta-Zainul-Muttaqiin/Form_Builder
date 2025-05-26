@@ -304,11 +304,14 @@ def display_selected_form(form_result: dict, form_path: str):
         if st.button("✅ Submit Form", type="primary", use_container_width=True):
             # Collect Answers from Session State
             new_answers = []
+            str_id = f"{uuid.uuid4()}".split('-')[0]
+            input_id = f"{datetime.now().strftime("%d%m%y-%H%M")}-{str_id}"
             for id_step, id_question, step_name, question_text in st.session_state.question_list:
                 key = f"step{id_step}_q{id_question}_{question_text[:5]}"
                 answer = st.session_state.get(key, "").strip()
                 if answer:
                     new_answers.append({
+                        "submit_id": input_id,
                         "form_name": form_title,
                         "step_name": step_name,
                         "question": question_text,
@@ -323,14 +326,14 @@ def display_selected_form(form_result: dict, form_path: str):
             if os.path.exists(csv_path):
                 df_existing = pd.read_csv(csv_path)
             else:
-                df_existing = pd.DataFrame(columns=["form_name", "step_name", "question", "answer"])
+                df_existing = pd.DataFrame(columns=["submit_id", "form_name", "step_name", "question", "answer"])
 
             # Convert both to DataFrame
             df_new = pd.DataFrame(new_answers)
 
             # Merge with existing: Remove duplicates (based on form_name + step_name + question)
             df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-            df_combined.drop_duplicates(subset=["form_name", "step_name", "question"], keep="last", inplace=True)
+            df_combined.drop_duplicates(subset=["submit_id", "form_name", "step_name", "question"], keep="last", inplace=True)
 
             # Save updated CSV
             df_combined.to_csv(csv_path, index=False)
