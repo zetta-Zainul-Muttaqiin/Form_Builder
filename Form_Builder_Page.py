@@ -437,6 +437,8 @@ def save_form_response(form_response: dict) -> str:
     os.makedirs(FORM_DIR, exist_ok=True)
     file_path = os.path.join(FORM_DIR, f"{form_id}.json")
     
+    st.session_state.form_loaded_name = file_path
+    
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(save_data, f, indent=2)
 
@@ -515,8 +517,10 @@ def main_page():
     st.divider()
 
     # *************** Display the Form Result ***************
-    if st.session_state.form_result:
-        display_selected_form(st.session_state.form_result, st.session_state.form_loaded_name)
+    form_result = st.session_state.get('form_result', {})
+    form_file = st.session_state.get('form_loaded_name', {})
+    if form_result:
+        display_selected_form(form_result, form_file)
 
 
 if __name__ == "__main__":
