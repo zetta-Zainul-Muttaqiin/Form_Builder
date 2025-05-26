@@ -354,13 +354,39 @@ def display_selected_form(form_result: dict, form_path: str):
     
     # *************** TAB 3: Display Saved Data ***************
     with tab3:
+        st.markdown("### 📊 Submitted Answers")
+        st.caption(f"Table Record of {form_title}")
+
         if os.path.exists(csv_path):
-            df_display = pd.read_csv(csv_path)
-            if not df_display.empty:
-                st.markdown("### 📊 Submitted Answers")
-                st.dataframe(df_display)
+            df_submitted = pd.read_csv(csv_path)
+
+            if df_submitted.empty:
+                st.info("No submissions yet.")
             else:
-                st.info("No data available in the CSV.")
+                # Toggle to switch view
+                toggle_pivot = st.toggle("↔ Filter to see answers grouped by submission", value=False)
+
+                if toggle_pivot:
+                    # Pivot the data: rows = submit_id, columns = question
+                    df_pivot = df_submitted.pivot_table(
+                        index='submit_id',
+                        columns='question',
+                        values='answer',
+                        aggfunc='first'  # In case of duplicates, show first answer
+                    ).reset_index()
+
+                    st.dataframe(df_pivot, use_container_width=True)
+                else:
+                    # Default raw view
+                    st.dataframe(df_submitted.sort_values(by="submit_id", ascending=False), use_container_width=True)
+
+                # Optional: download button
+                st.download_button(
+                    label="📥 Download CSV",
+                    data=df_submitted.to_csv(index=False),
+                    file_name=os.path.basename(csv_path),
+                    mime="text/csv"
+                )
         else:
             st.info("No submission has been made yet.")
 
