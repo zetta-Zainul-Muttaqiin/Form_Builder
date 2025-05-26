@@ -6,7 +6,7 @@ from langchain_core.tools import tool
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnableSequence
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
 
 from langgraph.graph import END, START, StateGraph
@@ -214,14 +214,16 @@ def run_agent_form(user_input: str) -> dict[str, list[dict]]:
 
     agent_form = agent_form_builder()
 
-    form_result = agent_form.invoke({"user_prompt": user_input})
+    with get_openai_callback() as cb:
+        form_result = agent_form.invoke({"user_prompt": user_input})
+
     if form_result.get('final_form') and isinstance(form_result['final_form'], str):
 
         final_form = convert_json(form_result.get('final_form'))
     else:
         final_form = form_result['final_form']
 
-    LOGGER.info(f"Form Generated {final_form.keys() if isinstance(final_form, dict) else {'type': f'{final_form}'}}")
+    LOGGER.info(f"Form Generated {final_form.keys() if isinstance(final_form, dict) else {'type': f'{final_form}'}} \n{cb}")
 
     return final_form
 

@@ -6,7 +6,7 @@ from typing import List
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnableSequence
-from langchain_core.pydantic_v1 import BaseModel
+from pydantic import BaseModel
 from langchain_community.callbacks import get_openai_callback
 
 from models.llms import LLMModels
