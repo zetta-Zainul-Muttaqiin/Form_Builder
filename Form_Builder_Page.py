@@ -306,9 +306,21 @@ def display_selected_form(form_result: dict, form_path: str):
             new_answers = []
             str_id = f"{uuid.uuid4()}".split('-')[0]
             input_id = f"{datetime.now().strftime("%d%m%y-%H%M")}-{str_id}"
+            
             for id_step, id_question, step_name, question_text in st.session_state.question_list:
-                key = f"step{id_step}_q{id_question}_{question_text[:5]}"
-                answer = st.session_state.get(key, "").strip()
+                key = f"step{id_step}_quest{id_question}"
+                answer = st.session_state.get(key, "")
+                
+                # Clean answer
+                if isinstance(answer, str):
+                    answer = answer.strip()
+                
+                elif isinstance(answer, list):
+                    answer = ', '.join(answer)
+                
+                elif isinstance(answer, datetime):
+                    answer = answer.strftime("%d/%m/%Y, %H:%M:%S")
+                
                 if answer:
                     new_answers.append({
                         "submit_id": input_id,
