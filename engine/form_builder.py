@@ -6,10 +6,12 @@ from langchain_core.tools import tool
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnableSequence
-from pydantic import BaseModel, Field
 from langchain_community.callbacks import get_openai_callback
+from pydantic import BaseModel, Field
 
 from langgraph.graph import END, START, StateGraph
+
+from engine.rag_engine import init_astradb_retriever
 
 from models.llms import LLMModels
 
@@ -18,6 +20,7 @@ from setup import LOGGER
 # *************** GRAPH STATE ***************
 class State(TypedDict):
     user_prompt: str
+    form_template: list[dict]
     form_description: str
     form_steps: str
     step_questions: str
@@ -84,6 +87,39 @@ Ensure type names match exactly and output is valid JSON.
 
     return generate_questions_chain.invoke({"prompt": prompt})
 
+
+@tool
+def retrieve_form(query):
+    """
+    Retrieve the most relevant forms from AstraDB based on a natural language query.
+
+    Args:
+        query (str): The user input or search query.
+
+    Returns:
+        list: A list of dictionaries containing matched content and metadata.
+    """
+
+    retriever = init_astradb_retriever()
+
+    # Run the query against the retriever
+    results = retriever.invoke(query)
+
+    # Handle case with no matches
+    if not results:
+        return [{"content": "", "type_of_form": "No match found"}]
+
+    # Parse and format matched documents
+    matched_forms = []
+    for doc in results:
+        matched_forms.append({
+            "content": doc.page_content,
+            "type_of_form": doc.metadata.get("type_of_form", "Unknown"),
+        })
+
+    return matched_forms
+
+
 def evaluate_generated_output(prompt: str, content: str, component: str) -> dict:
     """Evaluate the generated description/steps/questions"""
     eval_prompt = f"""
@@ -116,6 +152,9 @@ Input:
 
 User Input:
 {state.get('user_prompt')}
+
+Form Similar Context:
+{state.get('form_template')}
 
 Form Description:
 {state['form_description']}
@@ -164,6 +203,10 @@ def intilize_form_node(graph: StateGraph):
         "step_questions": generate_questions(state["user_prompt"])
     })
 
+    graph.add_node("get_form_similar", lambda state:{
+        "form_template": retrieve_form(state["user_prompt"])
+    })
+
     # Evaluators
     graph.add_node("evaluate_description", lambda state: evaluate_generated_output(state["user_prompt"], state["form_description"], "description"))
     graph.add_node("evaluate_steps", lambda state: evaluate_generated_output(state["user_prompt"], state["form_steps"], "steps"))
@@ -179,15 +222,24 @@ def agent_flow_form(graph: StateGraph):
     graph.add_edge(START, "generate_description")
     graph.add_edge(START, "generate_steps")
     graph.add_edge(START, "generate_questions")
+    
+    # retriever
+    graph.add_edge(START, "get_form_similar")
+
     # Evaluation
     graph.add_edge("generate_description", "evaluate_description")
     graph.add_edge("generate_steps", "evaluate_steps")
     graph.add_edge("generate_questions", "evaluate_questions")
+    
     # Final Form Generation
     # Assume all evaluations pass — can later add logic to loop back for optimization
     graph.add_edge("evaluate_description", "generate_final_form")
     graph.add_edge("evaluate_steps", "generate_final_form")
     graph.add_edge("evaluate_questions", "generate_final_form")
+
+
+
+    graph.add_edge("get_form_similar", "generate_final_form")
     graph.add_edge("generate_final_form", END)
 
 def agent_form_builder():
