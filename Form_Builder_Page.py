@@ -271,7 +271,7 @@ def display_selected_form(form_result: dict, form_path: str):
     form_title = form_content.get("form_title", "Form Title")
 
     # *************** Define Output Path ***************
-    output_dir = "data/output"
+    output_dir = os.path.join("data", "output")
     os.makedirs(output_dir, exist_ok=True)
     csv_file = os.path.splitext(os.path.basename(form_path))[0] + ".csv"
     csv_path = os.path.join(output_dir, csv_file)
@@ -288,15 +288,18 @@ def display_selected_form(form_result: dict, form_path: str):
     with tab2:
         st.markdown(f"### 📝 {form_title}")
         st.info(form_description)
-
         st.session_state.question_list = []
+        
         for id_step, step in enumerate(form_steps):
             step_name = step.get("step_name", f"Step {id_step + 1}")
+            
             with st.expander(f"{id_step + 1}/ {step_name}"):
+                
                 for id_question, question in enumerate(step.get("step_questions", [])):
+
                     render_question_input(question, id_step, id_question)
-                    print(f"{id_question} Question: {question}")
-                    st.session_state.question_list.append((id_step, id_question, step_name, question.get("question", "")))
+
+                    st.session_state.question_list.append((id_step, id_question, step_name, question.get("question_text", "")))
 
         if st.button("✅ Submit Form", type="primary", use_container_width=True):
             # Collect Answers from Session State
@@ -354,7 +357,7 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
     question_description = question.get("question_description", "")
     question_example = question.get("question_example", question_description)
     options = parse_list_type_example(question_example) if isinstance(question_example, str) else question_example
-    input_key = f"step{step_idx}_q{q_idx}_{question_text[:5]}"
+    input_key = f"step{step_idx}_quest{q_idx}"
 
     if question_type == "short_text":
         st.text_input(question_text, placeholder=question_example or "", key=input_key, help=question_description)
