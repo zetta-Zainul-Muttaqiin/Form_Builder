@@ -301,70 +301,8 @@ def display_selected_form(form_result: dict, form_path: str):
 
     # *************** TAB 2: Preview + Submit ***************
     with tab2:
-        st.markdown(f"### 📝 {form_title}")
-        st.info(form_description)
-        st.session_state.question_list = []
-        
-        for id_step, step in enumerate(form_steps):
-            step_name = step.get("step_name", f"Step {id_step + 1}")
-            
-            with st.expander(f"{id_step + 1}/ {step_name}"):
-                
-                for id_question, question in enumerate(step.get("step_questions", [])):
-
-                    render_question_input(question, id_step, id_question)
-
-                    st.session_state.question_list.append((id_step, id_question, step_name, question.get("question_text", "")))
-
-        if st.button("✅ Submit Form", type="primary", use_container_width=True):
-            # Collect Answers from Session State
-            new_answers = []
-            str_id = f"{uuid.uuid4()}".split('-')[0]
-            input_id = f"{datetime.now().strftime("%d%m%y-%H%M")}-{str_id}"
-            
-            for id_step, id_question, step_name, question_text in st.session_state.question_list:
-                key = f"step{id_step}_quest{id_question}"
-                answer = st.session_state.get(key, "")
-                
-                # Clean answer
-                if isinstance(answer, str):
-                    answer = answer.strip()
-                
-                elif isinstance(answer, list):
-                    answer = ', '.join(answer)
-                
-                elif isinstance(answer, datetime):
-                    answer = answer.strftime("%d/%m/%Y, %H:%M:%S")
-                
-                if answer:
-                    new_answers.append({
-                        "submit_id": input_id,
-                        "form_name": form_title,
-                        "step_name": step_name,
-                        "question": question_text,
-                        "answer": answer
-                    })
-
-            if not new_answers:
-                st.warning("No answers provided.")
-                return
-
-            # Load existing CSV if available
-            if os.path.exists(csv_path):
-                df_existing = pd.read_csv(csv_path)
-            else:
-                df_existing = pd.DataFrame(columns=["submit_id", "form_name", "step_name", "question", "answer"])
-
-            # Convert both to DataFrame
-            df_new = pd.DataFrame(new_answers)
-
-            # Merge with existing: Remove duplicates (based on form_name + step_name + question)
-            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-            df_combined.drop_duplicates(subset=["submit_id", "form_name", "step_name", "question"], keep="last", inplace=True)
-
-            # Save updated CSV
-            df_combined.to_csv(csv_path, index=False)
-            st.success(f"✅ Form submitted and saved to `{csv_path}`")
+        render_form_preview_tab(form_title, form_description, form_steps)
+        render_submit_button(form_title, csv_path)
 
     
     # *************** TAB 3: Display Saved Data ***************
@@ -406,18 +344,106 @@ def display_selected_form(form_result: dict, form_path: str):
             st.info("No submission has been made yet.")
 
 
+# *************** TAB 2: Preview + Submit ***************
+def render_form_preview_tab(form_title: str, form_description: str, form_steps: list[dict]):
+    st.markdown(f"### 📝 {form_title}")
+    st.info(form_description)
+
+    st.session_state.question_list = []
+
+    # Render all steps and questions
+    for id_step, step in enumerate(form_steps):
+        step_name = step.get("step_name", f"Step {id_step + 1}")
+
+        with st.expander(f"{id_step + 1}/ {step_name}"):
+            for id_question, question in enumerate(step.get("step_questions", [])):
+                
+                try:
+                    render_question_input(question, id_step, id_question)
+
+                except Exception as error_input:
+                    st.error(f"Error While Create input form for {step_name} -> {question}", icon="🚨")
+
+                st.session_state.question_list.append(
+                    (id_step, id_question, step_name, question.get("question_text", ""))
+                )
+
+def render_submit_button(form_title: str, csv_path: str):
+
+    # On Submit
+    if st.button("✅ Submit Form", type="primary", use_container_width=True):
+        if 'question_list' not in st.session_state:
+            st.warning("⚠️ No Input in the Form yet.")
+            return
+        
+        new_answers = collect_answers(form_title, st.session_state.get('question_list', []))
+
+        if not new_answers:
+            st.warning("⚠️ No answers provided.")
+            return
+
+        success = save_answers_to_csv(new_answers, csv_path)
+        if success:
+            st.success(f"✅ Form submitted and saved to `{csv_path}`")
 
 
+# *************** Utility: Format Answer Based on Type ***************
+def format_answer(answer):
+    if isinstance(answer, str):
+        return answer.strip()
+    elif isinstance(answer, list):
+        return ', '.join(str(a) for a in answer)
+    elif isinstance(answer, datetime):
+        return answer.strftime("%d/%m/%Y, %H:%M:%S")
+    return str(answer)
 
 
+# *************** Utility: Collect All Answers ***************
+def collect_answers(form_title, question_list):
+    new_answers = []
+    str_id = str(uuid.uuid4()).split('-')[0]
+    input_id = f"{datetime.now().strftime('%d%m%y-%H%M')}-{str_id}"
+
+    for id_step, id_question, step_name, question_text in question_list:
+        key = f"step{id_step}_quest{id_question}"
+        answer = st.session_state.get(key, "")
+
+        answer = format_answer(answer)
+
+        if answer:
+            new_answers.append({
+                "submit_id": input_id,
+                "form_name": form_title,
+                "step_name": step_name,
+                "question": question_text,
+                "answer": answer
+            })
+
+    return new_answers
 
 
+# *************** Utility: Save Answers to CSV Safely ***************
+def save_answers_to_csv(new_answers, csv_path):
+    try:
+        if os.path.exists(csv_path):
+            df_existing = pd.read_csv(csv_path)
+        else:
+            df_existing = pd.DataFrame(columns=["submit_id", "form_name", "step_name", "question", "answer"])
 
+        df_new = pd.DataFrame(new_answers)
+        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
 
-
-
+        df_combined.drop_duplicates(
+            subset=["submit_id", "form_name", "step_name", "question"],
+            keep="last",
+            inplace=True
         )
 
+        df_combined.to_csv(csv_path, index=False)
+        return True
+    except Exception as e:
+        st.error(f"❌ Error saving answers: {e}")
+        return False
 
 
 # *************** Render Question Input ***************
@@ -449,15 +475,6 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
     if render_func:
         render_func(question_text, input_key, question_description, options)
     else:
-        min_val, max_val = 1, 5
-
-    st.slider(
-        label=question_text,
-        min_value=min_val,
-        max_value=max_val,
-        key=input_key,
-        help=question_description
-    )
         st.warning(f"{question_text} - Unsupported input type: {question_type}")
 
 
