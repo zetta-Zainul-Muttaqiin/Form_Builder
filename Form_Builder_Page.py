@@ -12,6 +12,21 @@ from setup import LOGGER, QUESTION_TYPES
 from engine.form_builder import run_agent_form 
 from engine.prompt_suggestion import run_prompt_suggestion
 
+
+from helpers.streamlit_component import (
+    render_date_input,
+    render_duration,
+    render_email_input,
+    render_multiselect,
+    render_radio,
+    render_selectbox,
+    render_short_text,
+    render_slider_rating,
+    render_text_area_long,
+    render_time_input,
+    render_upload_document
+) 
+
 st.set_page_config(
     page_title="AI Form Builder",
     layout="centered",
@@ -102,7 +117,7 @@ def parse_list_type_example(example_text: str) -> list[str]:
     """
     Parse list-type example string into a list of options.
     
-    Supports delimiters: newline (\n), comma (,), semicolon (;), slash (/), and backslash (\).
+    Supports delimiters: newline (\n), comma (,), semicolon (;), slash (/), and backslash.
     """
     if not isinstance(example_text, str):
         return []
@@ -391,8 +406,23 @@ def display_selected_form(form_result: dict, form_path: str):
             st.info("No submission has been made yet.")
 
 
+
+
+
+
+
+
+
+
+
+
+        )
+
+
+
 # *************** Render Question Input ***************
 def render_question_input(question: dict, step_idx: int, q_idx: int):
+    
     question_text = question.get("question_text", "Untitled")
     question_type = question.get("question_type", "Unknown").lower().strip()
     question_description = question.get("question_description", "")
@@ -400,81 +430,24 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
     options = parse_list_type_example(question_example) if isinstance(question_example, str) else question_example
     input_key = f"step{step_idx}_quest{q_idx}"
 
-    if question_type == "short_text":
-        st.text_input(question_text, placeholder=question_example or "", key=input_key, help=question_description)
+    RENDERERS = {
+        "short_text": render_short_text,
+        "text_area_long": render_text_area_long,
+        "date": render_date_input,
+        "time": render_time_input,
+        "duration": render_duration,
+        "email": render_email_input,
+        "multiple_choice_dropdown_menu": render_multiselect,
+        "dropdown_single_option": render_selectbox,
+        "multiple_option": render_multiselect,
+        "single_option": render_radio,
+        "slider_rating": render_slider_rating,
+        "upload_document": render_upload_document
+    }
 
-    elif question_type == "text_area_long":
-        st.text_area(question_text, placeholder=question_example or "", key=input_key)
-
-    elif question_type == "date":
-        st.date_input(question_text, key=input_key, help=question_description)
-
-    elif question_type == "time":
-        st.time_input(question_text, key=input_key)
-
-    elif question_type == "duration":
-        st.text_input(f"{question_text} (e.g. 1h 30m)", key=input_key, help=question_description)
-
-    elif question_type == "email":
-        st.text_input(question_text, placeholder="example@example.com", key=input_key, help=question_description)
-
-    elif question_type == "multiple_choice_dropdown_menu":
-        st.multiselect(
-            question_text, 
-            options=options, 
-            key=input_key,
-            help=question_description
-        )
-
-    elif question_type == "dropdown_single_option":
-        st.selectbox(
-            question_text, 
-            options=options, 
-            key=input_key,
-            help=question_description
-        )
-
-    elif question_type == "multiple_option":
-        st.multiselect(
-            question_text, 
-            options=options, 
-            key=input_key,
-            help=question_description
-        )
-
-    elif question_type == "single_option":
-        st.radio(
-            question_text, 
-            options=options, 
-            key=input_key,
-            help=question_description
-        )
-
-    elif question_type == "slider_rating":
-        render_slider_rating(question_text, question_example, input_key, question_description)
-
-    elif question_type == "upload_document":
-        st.file_uploader(
-            question_text, 
-            type=["pdf", "docx", "txt"], 
-            key=input_key,
-            help=question_description
-            )
-
-    else:
-        st.warning(f"{question_text} - Unsupported input type: {question_type}")
-
-
-def render_slider_rating(question_text: str, question_example: str, input_key: str, question_description: str):
-    if question_example:
-        try:
-            # Try splitting by ' - ', ',' or space
-            parts = re.split(r"[,\s\-]+", question_example.strip())
-            min_val = int(parts[0])
-            max_val = int(parts[1]) if len(parts) > 1 else min_val + 9
-        except Exception as e:
-            st.warning(f"⚠️ Invalid example format for slider: '{question_example}'. Using default 1-5")
-            min_val, max_val = 1, 5
+    render_func = RENDERERS.get(question_type)
+    if render_func:
+        render_func(question_text, input_key, question_description, options)
     else:
         min_val, max_val = 1, 5
 
@@ -485,6 +458,7 @@ def render_slider_rating(question_text: str, question_example: str, input_key: s
         key=input_key,
         help=question_description
     )
+        st.warning(f"{question_text} - Unsupported input type: {question_type}")
 
 
 def save_form_response(form_response: dict) -> str:
