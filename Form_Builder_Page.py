@@ -571,6 +571,7 @@ def main_page():
                 label = f"{display_title} — 🕒 {created_at.replace('_', '/')}"
 
                 form_items.append(label)
+                form_items.append("---")
                 form_map[label] = {
                     "data": data,
                     "file_name": file_name
