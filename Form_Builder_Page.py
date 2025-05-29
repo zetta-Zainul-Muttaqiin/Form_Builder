@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_option_menu import option_menu
 import pandas as pd
 import os
 import re
@@ -36,6 +37,11 @@ st.set_page_config(
 # *************** Session State to Hold Form Result ***************
 if "form_result" not in st.session_state:
     st.session_state.form_result = None
+
+if "form_loaded_name" not in st.session_state:
+                st.session_state.form_loaded_name = None
+                st.session_state.form_result = None
+
 
 
 # *************** Prompt Popup Dialog ***************
@@ -542,33 +548,57 @@ def main_page():
         st.markdown("### 📄 Generated Forms")
 
         form_files = list_saved_forms()
-        with st.container(border=True, height=350):
-            if not form_files:
-                st.info("No saved forms found.")
-            else:
-                for file_path in form_files:
-                    data = load_form_content(file_path)
-                    file_name = os.path.basename(file_path)
-                    form_id = data.get('form_id', 'id')
-                    form_title = data.get("form_content").get('form_title', '')
-                    created_at = data.get("timestamp", {}).get("created_at", "unknown")
+        
+        if not form_files:
+            st.info("No saved forms found.")
+        
+        else:
+            st.caption("Please Select on of the Form Generated first.")
+            
+            # *************** Load form data ***************
+            form_items = []
+            form_map = {}
 
-                    # Display card-like layout
-                    container = st.container(key=form_id)
-                    container.markdown(f"""
-                        <div style="border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin-bottom: 10px;">
-                            <strong>{form_title if form_title else file_name}</strong><br>
-                            <span style='color: gray;'>🕒 {created_at}</span><br><br>
-                        </div>
-                    """, unsafe_allow_html=True)
+            for file_path in form_files:
+                data = load_form_content(file_path)
+                file_name = os.path.basename(file_path)
 
-                    view_key = f"view_{form_id}"
-                    view_button = container.button("🔍 View", key=view_key)
-                    if view_button:
-                        st.session_state.form_result = data
-                        st.session_state.form_loaded_name = file_name  # optional: track which was loaded
-                    
-                    st.markdown("\n")
+                form_title = data.get("form_content", {}).get('form_title', '')
+                created_at = data.get("timestamp", {}).get("created_at", "unknown")
+
+                # Format label to show title and created time
+                display_title = form_title or file_name
+                label = f"{display_title} — 🕒 {created_at.replace('_', '/')}"
+
+                form_items.append(label)
+                form_map[label] = {
+                    "data": data,
+                    "file_name": file_name
+                }
+
+            # *************** FORM OPTION MENU ***************
+            selected_label = option_menu(
+                menu_title="",
+                options=form_items,
+                icons=["file-earmark-text"] * len(form_items),
+                menu_icon=None,
+                default_index=0,
+                styles={
+                    "nav-link-selected": {"background-color": "#F84952"},
+                    "nav-link": {
+                        "white-space": "normal",
+                        "height": "auto",
+                        "min-height": "50px",
+                        "font-size": "13px"
+                    },
+                }
+            )
+
+            # *************** Update selected form ***************
+            selected_form = form_map[selected_label]
+            st.session_state.form_result = selected_form["data"]
+            st.session_state.form_loaded_name = selected_form["file_name"]
+
                 
     
     # *************** Show Prompt Button ***************
