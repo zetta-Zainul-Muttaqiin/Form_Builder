@@ -356,15 +356,22 @@ def display_selected_form(form_result: dict, form_path: str):
 
 def render_chat_form(form_result: dict):
     st.markdown("### 🤖 Chat with Form Assistant")
+    
+    # Check and set directory
+    FORM_DIR = os.path.join('data','form_builder')
+    MEMORY_DIR = os.path.join('data','chat_history')
+    os.makedirs(FORM_DIR, exist_ok=True)
+    os.makedirs(MEMORY_DIR, exist_ok=True)
 
     form_id = form_result.get("form_id") if "form_result" in st.session_state else None
+
 
     if not form_id:
         st.warning("Please select a form first.")
         st.stop()
 
     # Load form JSON
-    form_path = f"data/form_builder/{form_id}.json"
+    form_path = os.path.join(FORM_DIR, f"{form_id}.json")
     if not os.path.exists(form_path):
         st.error(f"Form not found: {form_path}")
         st.stop()
@@ -373,7 +380,7 @@ def render_chat_form(form_result: dict):
         current_form = json.load(f)
 
     # Load chat history
-    memory_path = f"data/chat_history/memory_{form_id}.json"
+    memory_path = os.path.join(MEMORY_DIR, f"memory_{form_id}.json")
     if os.path.exists(memory_path):
         with open(memory_path) as f:
             messages = json.load(f)
