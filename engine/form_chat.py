@@ -44,26 +44,26 @@ def question_suggester(state: FormAssistantState) -> FormAssistantState:
     # Example LLM logic
     result = LLMModels().nano.invoke(f"Suggest new questions for this form:\n{state['form']}")
     state["suggested_questions"] = result.json()
-    LOGGER.info("question_suggester: ", state.get("suggested_questions", "None"))
+    LOGGER.info(f"question_suggester: {state.get('suggested_questions', 'None')}")
     return state
 
 def command_suggester(state: FormAssistantState) -> FormAssistantState:
     result = LLMModels().nano.invoke(f"Suggest commands to edit the form:\n{state['form']}")
     state["suggested_commands"] = result.json()
-    LOGGER.info("command_suggester: ", state.get("suggested_commands", "None"))
+    LOGGER.info(f"command_suggester: {state.get('suggested_commands', 'None')}")
     return state
 
 def template_retriever(state: FormAssistantState) -> FormAssistantState:
     # You can add vector-based retrieval here
     retriever = init_astradb_retriever()
     state["retrieved_templates"] = retriever.invoke(state["user_input"])
-    LOGGER.info("template_retriever: ", state.get('retrieved_templates', "None"))
+    LOGGER.info(f"template_retriever: {state.get('retrieved_templates', "None")}")
     return state
 
 def context_extractor(state: FormAssistantState) -> FormAssistantState:
     # Optional: Parse form into structured metadata
     state["form_structure"] = f"Current Form Generated {state['form']}"
-    LOGGER.info("context_extractor: ", state.get("form_structure", "None"))
+    LOGGER.info(f"context_extractor:  {state.get('form_structure', 'None')}")
     return state
 
 def llm_response_generator(state: FormAssistantState) -> FormAssistantState:
@@ -79,7 +79,7 @@ def llm_response_generator(state: FormAssistantState) -> FormAssistantState:
     Reply with a user-facing message.
     """)
     state["messages"].append({"role": "assistant", "content": result.content})
-    LOGGER.info("llm_response_generator: ", state.get("messages", "None"))
+    LOGGER.info(f"llm_response_generator: {state.get('messages', 'None')}")
     return state
 
 
@@ -116,17 +116,17 @@ def input_analyzer(state: FormAssistantState) -> FormAssistantState:
     try:
         parsed = output_parser.parse(raw_response.content)
         state["analysis"] = parsed.model_dump()
-    except Exception as e:
-        LOGGER.info("Parser Error:", e)
+    except Exception as error:
+        LOGGER.error(f"Parser Error: {error}")
         state["analysis"] = {"intent": "unclear", "reason": "Could not parse response properly."}
 
-    LOGGER.info("input_analyzer:", state["analysis"])
+    LOGGER.info(f"input_analyzer: {state['analysis']}")
     return state
 
 
 def suggestion_condition(state: FormAssistantState) -> str:
     intent = state["analysis"]["intent"]
-    LOGGER.info("suggestion_condition: ", intent)
+    LOGGER.info(f"suggestion_condition: {intent}")
     if intent == "suggest_questions":
         return "question_suggester"
     elif intent == "suggest_command":
@@ -139,7 +139,7 @@ def suggestion_condition(state: FormAssistantState) -> str:
 def chatbot(state: FormAssistantState) -> FormAssistantState:
     if not state.get("original_prompt"):
         state["original_prompt"] = state["user_input"]
-    LOGGER.info("chatbot: ", state.get("messages", "None"))
+    LOGGER.info(f"chatbot: {state.get('messages', 'None')}")
     return state
 
 
