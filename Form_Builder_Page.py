@@ -12,6 +12,7 @@ from setup import LOGGER, QUESTION_TYPES
 
 from engine.form_builder import run_agent_form 
 from engine.prompt_suggestion import run_prompt_suggestion
+from engine.form_chat import run_form_assist
 
 
 from helpers.streamlit_component import (
@@ -81,7 +82,7 @@ def handle_generate_form(prompt_text: str) -> None:
             return
 
         if result:
-            save_form_response(result)  # Save JSON file
+            save_form_response(result, prompt_text)  # Save JSON file
             st.rerun()  # Trigger refresh to show in preview tab
 
 @st.dialog("Enter Form Prompt", width="large")
@@ -352,6 +353,7 @@ def display_selected_form(form_result: dict, form_path: str):
     # *************** TAB 4: CHAT BASED with FORM ASSISTANCE ***********
     with tab4:
         render_chat_form(form_result)
+
 def render_chat_form(form_result: dict):
     st.markdown("### 🤖 Chat with Form Assistant")
 
@@ -389,6 +391,21 @@ def render_chat_form(form_result: dict):
         # Display user input
         st.chat_message("user").markdown(user_input)
 
+        # Run assistant
+        result = run_form_assist(input=user_input, current_form=current_form, messages=messages)
+        
+        # Get assistant reply and updated memory
+        assistant_reply = result.get("answer", "No response.")
+        updated_messages = result.get("append_messages", [])
+
+        # Display assistant response
+        with st.chat_message("assistant"):
+            st.markdown(assistant_reply)
+
+        # Save chat history
+        messages.extend(updated_messages)
+        with open(memory_path, "w") as f:
+            json.dump(messages, f, indent=2)
 
 # *************** TAB 2: Preview + Submit ***************
 def render_form_preview_tab(form_title: str, form_description: str, form_steps: list[dict]):
@@ -524,7 +541,7 @@ def render_question_input(question: dict, step_idx: int, q_idx: int):
         st.warning(f"{question_text} - Unsupported input type: {question_type}")
 
 
-def save_form_response(form_response: dict) -> str:
+def save_form_response(form_response: dict, user_input: str) -> str:
 
     FORM_DIR = os.path.join('data', 'form_builder')
     # *************** Generate ID and Timestamp ***************
@@ -537,6 +554,7 @@ def save_form_response(form_response: dict) -> str:
         "timestamp": {
             "created_at": created_at
         },
+        "original_prompt": user_input,
         "form_content": form_response
     }
     st.session_state.form_result = save_data
@@ -652,7 +670,7 @@ def main_page():
     form_result = st.session_state.get('form_result', {})
     form_file = st.session_state.get('form_loaded_name', {})
     if form_result:
-        display_selected_form(form_result, form_file)
+        display_selected_form(form_result, form_file) 
 
 
 if __name__ == "__main__":
