@@ -139,3 +139,41 @@ def chatbot(state: FormAssistantState) -> FormAssistantState:
         state["original_prompt"] = state["user_input"]
     print("chatbot: ", state.get("messages", "None"))
     return state
+
+
+def build_chat():
+    builder = StateGraph(FormAssistantState)
+
+    # Core nodes
+    builder.add_node("chatbot", chatbot)  # receives initial user_input
+    builder.add_node("input_analyzer", input_analyzer)
+    builder.add_node("question_suggester", question_suggester)
+    builder.add_node("command_suggester", command_suggester)
+    builder.add_node("template_retriever", template_retriever)
+    builder.add_node("context_extractor", context_extractor)
+    builder.add_node("llm_response", llm_response_generator)
+    # builder.add_node("suggestion_condition", suggestion_condition)
+
+    # Edges
+    builder.set_entry_point("chatbot")
+    builder.add_edge("chatbot", "input_analyzer")
+    builder.add_conditional_edges(
+        "input_analyzer",
+        suggestion_condition,
+        path_map={
+            "question_suggester": "question_suggester",
+            "command_suggester": "command_suggester",
+            "template_retriever": "template_retriever",
+            "context_extractor": "context_extractor"
+        }
+    )
+
+    # Continue flow to context_extractor then response
+    builder.add_edge("question_suggester", "context_extractor")
+    builder.add_edge("command_suggester", "context_extractor")
+    builder.add_edge("template_retriever", "context_extractor")
+    builder.add_edge("context_extractor", "llm_response")
+
+    builder.set_finish_point("llm_response")
+
+    return builder.compile()
