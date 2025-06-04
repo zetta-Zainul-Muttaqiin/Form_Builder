@@ -354,23 +354,25 @@ def display_selected_form(form_result: dict, form_path: str):
     with tab4:
         render_chat_form(form_result)
 
+import streamlit as st
+import os
+import json
+
 def render_chat_form(form_result: dict):
     st.markdown("### 🤖 Chat with Form Assistant")
-    
-    # Check and set directory
-    FORM_DIR = os.path.join('data','form_builder')
-    MEMORY_DIR = os.path.join('data','chat_history')
+
+    # *************** Directories ***************
+    FORM_DIR = os.path.join('data', 'form_builder')
+    MEMORY_DIR = os.path.join('data', 'chat_history')
     os.makedirs(FORM_DIR, exist_ok=True)
     os.makedirs(MEMORY_DIR, exist_ok=True)
 
+    # *************** Form Validation ***************
     form_id = form_result.get("form_id") if "form_result" in st.session_state else None
-
-
     if not form_id:
         st.warning("Please select a form first.")
         st.stop()
 
-    # Load form JSON
     form_path = os.path.join(FORM_DIR, f"{form_id}.json")
     if not os.path.exists(form_path):
         st.error(f"Form not found: {form_path}")
@@ -379,7 +381,7 @@ def render_chat_form(form_result: dict):
     with open(form_path) as f:
         current_form = json.load(f)
 
-    # Load chat history
+    # *************** Chat Memory Load ***************
     memory_path = os.path.join(MEMORY_DIR, f"memory_{form_id}.json")
     if os.path.exists(memory_path):
         with open(memory_path) as f:
@@ -387,32 +389,44 @@ def render_chat_form(form_result: dict):
     else:
         messages = []
 
-    # Display existing messages
-    for msg in messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    # *************** Chat Display Container ***************
+    with st.container(border=True):
+        for msg in messages:
+            role = msg["role"]
+            content = msg["content"]
+            if role == "user":
+                with st.chat_message("user"):
+                    st.markdown(content)
+            elif role == "assistant":
+                with st.chat_message("assistant"):
+                    st.markdown(content)
 
-    # Get user input
+    # *************** Chat Input & Assistant Response ***************
     user_input = st.chat_input("Ask something about this form...")
+
     if user_input:
-        # Display user input
-        st.chat_message("user").markdown(user_input)
+        # Display user input message
+        with st.chat_message("user"):
+            st.markdown(user_input)
 
-        # Run assistant
+        # Run assistant logic
         result = run_form_assist(input=user_input, current_form=current_form, messages=messages)
-        
-        # Get assistant reply and updated memory
         assistant_reply = result.get("answer", "No response.")
-        updated_messages = result.get("append_messages", [])
-
+        updated_messages = result.get("new_history", [])
+        
         # Display assistant response
         with st.chat_message("assistant"):
             st.markdown(assistant_reply)
 
-        # Save chat history
+        # Save updated chat history
+        messages = messages[:len(messages)-1]
         messages.extend(updated_messages)
+        
         with open(memory_path, "w") as f:
             json.dump(messages, f, indent=2)
+
+        st.rerun()
+
 
 # *************** TAB 2: Preview + Submit ***************
 def render_form_preview_tab(form_title: str, form_description: str, form_steps: list[dict]):
