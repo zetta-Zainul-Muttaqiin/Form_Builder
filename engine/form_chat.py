@@ -177,3 +177,32 @@ def build_chat():
     builder.set_finish_point("llm_response")
 
     return builder.compile()
+
+def run_form_assist(input: str, current_form: dict,  messages:list=[]):
+    """"""
+
+    graph_chat = build_chat()
+    result = graph_chat.invoke({
+        "user_input": input,
+        "form": current_form,
+        "messages": messages
+    })
+    print("RESULT: ", result)
+    answer = result['messages'][-1]['content']
+    append_meesages = [
+        {
+            "role": "user",
+            "content": input
+        },
+        {
+            "role": "assistant",
+            "content": answer
+        }
+    ]
+
+    assistant_output = {
+        "answer": answer,
+        "new_history": append_meesages
+    }
+
+    return assistant_output
