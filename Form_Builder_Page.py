@@ -298,7 +298,7 @@ def display_selected_form(form_result: dict, form_path: str):
     csv_path = os.path.join(output_dir, csv_file)
 
     # *************** Display Tabs ***************
-    tab1, tab2, tab3 = st.tabs(["🗂 Form Details", "📝 Preview Form", "📊 Form Table Preview"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🗂 Form Details", "📝 Preview Form", "📊 Form Table Preview", "💬 Form Assistance"])
 
 
     # *************** Tab 1: Form Details ***************
@@ -348,6 +348,46 @@ def display_selected_form(form_result: dict, form_path: str):
                 )
         else:
             st.info("No submission has been made yet.")
+    
+    # *************** TAB 4: CHAT BASED with FORM ASSISTANCE ***********
+    with tab4:
+        render_chat_form(form_result)
+def render_chat_form(form_result: dict):
+    st.markdown("### 🤖 Chat with Form Assistant")
+
+    form_id = form_result.get("form_id") if "form_result" in st.session_state else None
+
+    if not form_id:
+        st.warning("Please select a form first.")
+        st.stop()
+
+    # Load form JSON
+    form_path = f"data/form_builder/{form_id}.json"
+    if not os.path.exists(form_path):
+        st.error(f"Form not found: {form_path}")
+        st.stop()
+
+    with open(form_path) as f:
+        current_form = json.load(f)
+
+    # Load chat history
+    memory_path = f"data/chat_history/memory_{form_id}.json"
+    if os.path.exists(memory_path):
+        with open(memory_path) as f:
+            messages = json.load(f)
+    else:
+        messages = []
+
+    # Display existing messages
+    for msg in messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Get user input
+    user_input = st.chat_input("Ask something about this form...")
+    if user_input:
+        # Display user input
+        st.chat_message("user").markdown(user_input)
 
 
 # *************** TAB 2: Preview + Submit ***************
