@@ -354,9 +354,6 @@ def display_selected_form(form_result: dict, form_path: str):
     with tab4:
         render_chat_form(form_result)
 
-import streamlit as st
-import os
-import json
 
 def render_chat_form(form_result: dict):
     st.markdown("### 🤖 Chat with Form Assistant")
@@ -378,10 +375,7 @@ def render_chat_form(form_result: dict):
         st.error(f"Form not found: {form_path}")
         st.stop()
 
-    with open(form_path) as f:
-        current_form = json.load(f)
-
-    # *************** Chat Memory Load ***************
+    # *************** Load Chat History ***************
     memory_path = os.path.join(MEMORY_DIR, f"memory_{form_id}.json")
     if os.path.exists(memory_path):
         with open(memory_path) as f:
@@ -389,41 +383,43 @@ def render_chat_form(form_result: dict):
     else:
         messages = []
 
-    # *************** Chat Display Container ***************
+    # *************** Render Chat Messages ***************
     with st.container(border=True):
         for msg in messages:
-            role = msg["role"]
-            content = msg["content"]
-            if role == "user":
-                with st.chat_message("user"):
-                    st.markdown(content)
-            elif role == "assistant":
-                with st.chat_message("assistant"):
-                    st.markdown(content)
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
-    # *************** Chat Input & Assistant Response ***************
+    # *************** Input from User ***************
     user_input = st.chat_input("Ask something about this form...")
 
     if user_input:
-        # Display user input message
+        # Show user input immediately
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        # Run assistant logic
-        result = run_form_assist(input=user_input, current_form=current_form, messages=messages)
-        assistant_reply = result.get("answer", "No response.")
-        updated_messages = result.get("new_history", [])
-        
-        # Display assistant response
-        with st.chat_message("assistant"):
-            st.markdown(assistant_reply)
+        with st.spinner("Thinking...", show_time=True):
+            # Run agent
+            result = run_form_assist(
+                user_input=user_input,
+                form_id=form_id,
+                messages=messages
+            )
 
-        # Save updated chat history
-        messages = messages[:len(messages)-1]
-        messages.extend(updated_messages)
-        
-        with open(memory_path, "w") as f:
-            json.dump(messages, f, indent=2)
+            assistant_reply = result.get("answer", "No response.")
+            new_messages = result.get("new_history", [])
+
+            # Show assistant reply
+            with st.chat_message("assistant"):
+                st.markdown(assistant_reply)
+
+            # *************** Update & Save Messages ***************
+            if new_messages:
+                messages.extend(new_messages[-2:])  # Only append the latest user + assistant pair
+
+            with open(memory_path, "w") as f:
+                json.dump(messages, f, indent=2)
+
+            st.rerun()
 
         st.rerun()
 
