@@ -1,6 +1,5 @@
 # *************** IMPORT FRAMEWORK *************** 
 from langchain_openai import ChatOpenAI
-from openai import OpenAI
 from setup import OPENAI_API_KEY
 
 # *************** Class for Initializing OpenAI LLM Models
@@ -9,7 +8,7 @@ class LLMModels:
     A class for initializing and managing OpenAI-based Large Language Models (LLMs).
 
     Features:
-        - Initializes an OpenAI GPT-4o-mini model for processing CV-related tasks.
+        - Initializes an OpenAI gpt-4.1-nano model for processing CV-related tasks.
         - Configures model parameters such as temperature, token limit, and API key.
 
     Attributes:
@@ -17,7 +16,7 @@ class LLMModels:
 
     Methods:
         create_llm_cv() -> ChatOpenAI:
-            Creates and returns an instance of the OpenAI GPT-4o-mini model.
+            Creates and returns an instance of the OpenAI gpt-4.1-nano model.
     """
 
     def __init__(self):
@@ -29,13 +28,13 @@ class LLMModels:
     # *************** Define a function for initializing OpenAI LLM
     def nano(self) -> ChatOpenAI:
         """
-        Creates and configures an instance of OpenAI's GPT-4o-mini model.
+        Creates and configures an instance of OpenAI's gpt-4.1-nano model.
 
         Returns:
             ChatOpenAI: An instance of the OpenAI model with the specified configuration.
 
         Configuration:
-            - Model: "gpt-4o-mini"
+            - Model: "gpt-4.1-nano"
             - Temperature: 1 (high variability in responses)
             - Max Tokens: 4096
             - API Key: Uses predefined `OPENAI_API_KEY`
